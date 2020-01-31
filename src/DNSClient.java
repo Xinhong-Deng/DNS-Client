@@ -1,7 +1,5 @@
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,14 +15,54 @@ public class DNSClient {
     static ByteBuffer server;
     static String domainName;
 
+    static int retryCount = 0;
+
     public static void main(String[] args) {
         try {
             parseUserInput(args);
             testParser();
-            //DatagramSocket socket = new DatagramSocket();
+            InetAddress addr = InetAddress.getByAddress(server.array());
+            DatagramSocket socket = new DatagramSocket(port, addr);
+            socket.setSoTimeout(timeOutMs);
+            DatagramPacket queryPacket = buildQueryPacket();
+
+            int lengthResponseBytes = 100;
+            byte[] responseBytes = new byte[lengthResponseBytes];
+            DatagramPacket responsePacket = new DatagramPacket(responseBytes, lengthResponseBytes, addr, port);
+            socket.send(queryPacket);
+
+            tryReceiveResponse(socket, responsePacket);
+            String interpredResult = interpretResponsePacket(responsePacket);
+            System.out.println(interpredResult);
+
         } catch (UserInputException e) {
             System.out.println("ERROR\t" + "Incorrect input syntax: " + e.getMessage());
+        } catch (UnknownHostException e) {
+            System.out.println("ERROR\t" + "IP address provided is unknown: " + Arrays.toString(server.array()));
+        } catch (SocketException e) {
+            System.out.println("ERROR\t" + "Cannot open socket");
+        } catch (IOException e) {
+            System.out.println("ERROR\t" + "I/O exception at send");
+        } catch (SocketTimeoutException e) {
+            System.out.println("ERROR\t");
         }
+    }
+
+    private static void tryReceiveResponse(DatagramSocket socket, DatagramPacket responsePacket) throws SocketTimeoutException  {
+        //todo: double check this
+        try {
+            socket.receive(responsePacket);
+        } catch (SocketTimeoutException e) {
+            if (retryCount > maxRetries) {
+                throw new SocketTimeoutException("Exceed max retry limit.");
+            }
+            retryCount ++;
+            tryReceiveResponse(socket, responsePacket);
+
+        } catch (IOException e) {
+
+        }
+        retryCount = 0;
     }
 
     private static void parseUserInput(String[] userInput) throws UserInputException {
