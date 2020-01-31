@@ -23,30 +23,33 @@ public class DNSClient {
             //DatagramSocket socket = new DatagramSocket();
         } catch (Exception e) {
             //wrong handle!!!
-            e.printStackTrace();
+            System.out.println(e.getMessage());
         }
     }
 
     private static void parseUserInput(String[] userInput) throws Exception {
-        //todo: how to find out incorrect user input in a systematic way?
+        //todo: probably want a new exception tyep?
 
         for (int i = 0; i < userInput.length; i++) {
-            System.out.println(i + "th input: " + userInput[i]);
+
             if (userInput[i].equals("-t")) {
                 i++;
                 timeOutMs = Integer.parseInt(userInput[i]) * 1000;
+                //todo: cannot construct the error message from the NumberFormatException in the main()!!
                 continue;
             }
 
             if (userInput[i].equals("-r")) {
                 i++;
                 maxRetries = Integer.parseInt(userInput[i]);
+                //todo: cannot construct the error message from the NumberFormatException in the main()!!
                 continue;
             }
 
             if (userInput[i].equals("-p")) {
                 i++;
                 port = Integer.parseInt(userInput[i]);
+                //todo: cannot construct the error message from the NumberFormatException in the main()!!
                 continue;
             }
 
@@ -73,21 +76,35 @@ public class DNSClient {
                 String[] temp = userInput[i].split("@");
                 String[] labels = (temp[1]).split("\\.");
 
+                if (labels.length != 4) {
+                    throw  new Exception("invalid ip address");
+                }
+
                 ArrayList<Integer> intLabels = new ArrayList<>();
                 for (int y = 0; y < labels.length; y++) {
-                    intLabels.add(Integer.parseInt(labels[y]));
+                    Integer intValue = Integer.parseInt(labels[y]);
+                    if (intValue >= 128) {
+                        throw new Exception("invalid ip address");
+                    }
+
+                    intLabels.add(intValue);
                 }
                 server = ByteBuffer.allocate(4);
                 intLabels.forEach(intLable -> {
                     server.put(intLable.byteValue());
-                    //todo: double check
                 });
                 continue;
             }
 
             if (i == userInput.length - 1) {
-                //todo: check that whether this satisfy the domain name format
-                // before assigning it to domainName!!!
+
+                List<String> labels = Arrays.asList(userInput[i].split("\\."));
+                boolean isInvalidName = labels.stream().anyMatch(n -> n.length() == 0)
+                        || labels.size() == 0;
+                if (isInvalidName) {
+                    throw new Exception("incorrect userinput");
+                }
+
                 domainName = userInput[i];
                 continue;
             }
@@ -96,6 +113,20 @@ public class DNSClient {
             //todo: should describe the error!! redesign it!!!
             //todo: should be able to figure out some are missing (here or in main??)
 
+            //todo: potnetial error
+            // 1. ip address does not have @ (don't know how to deal with it)
+            // 2. name not provided
+            // 3. ip not provided
+            // 4. unknown option
+            // NOT HANDLE name missing and (ip without @) case!!!
+        }
+
+        if (server == null) {
+            throw new Exception("server is not provided");
+        }
+
+        if (domainName == null) {
+            throw  new Exception("name is not provided");
         }
 
     }
