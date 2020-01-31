@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -21,41 +22,51 @@ public class DNSClient {
             parseUserInput(args);
             testParser();
             //DatagramSocket socket = new DatagramSocket();
-        } catch (Exception e) {
-            //wrong handle!!!
-            System.out.println(e.getMessage());
+        } catch (UserInputException e) {
+            System.out.println("ERROR\t" + "Incorrect input syntax: " + e.getMessage());
         }
     }
 
-    private static void parseUserInput(String[] userInput) throws Exception {
-        //todo: probably want a new exception tyep?
+    private static void parseUserInput(String[] userInput) throws UserInputException {
 
         for (int i = 0; i < userInput.length; i++) {
 
             if (userInput[i].equals("-t")) {
                 i++;
-                timeOutMs = Integer.parseInt(userInput[i]) * 1000;
-                //todo: cannot construct the error message from the NumberFormatException in the main()!!
+                try {
+                    timeOutMs = Integer.parseInt(userInput[i]) * 1000;
+                } catch (NumberFormatException numberE) {
+                    throw new UserInputException("Not provide integer value for -t");
+                }
+
                 continue;
             }
 
             if (userInput[i].equals("-r")) {
                 i++;
-                maxRetries = Integer.parseInt(userInput[i]);
-                //todo: cannot construct the error message from the NumberFormatException in the main()!!
+                try {
+                    maxRetries = Integer.parseInt(userInput[i]);
+                } catch (NumberFormatException e) {
+                    throw new UserInputException("Not provide integer value for -r");
+                }
+
                 continue;
             }
 
             if (userInput[i].equals("-p")) {
                 i++;
-                port = Integer.parseInt(userInput[i]);
-                //todo: cannot construct the error message from the NumberFormatException in the main()!!
+                try {
+                    port = Integer.parseInt(userInput[i]);
+                } catch (NumberFormatException e) {
+                    throw new UserInputException("Not provide integer value for -p");
+                }
+
                 continue;
             }
 
             if (userInput[i].equals("-mx")) {
                 if (type != Type.A) {
-                    throw new Exception("cannot set to -ns and -mx at the same time");
+                    throw new UserInputException("Cannot set to -ns and -mx at the same time");
                 }
 
                 type = Type.MX;
@@ -64,7 +75,7 @@ public class DNSClient {
 
             if (userInput[i].equals("-ns")) {
                 if (type != Type.A) {
-                    throw new Exception("cannot set to -ns and -mx at the same time");
+                    throw new UserInputException("Cannot set to -ns and -mx at the same time");
                 }
 
                 type = Type.NS;
@@ -72,19 +83,18 @@ public class DNSClient {
             }
 
             if (userInput[i].charAt(0) == '@') {
-                System.out.println("enter the server ip");
                 String[] temp = userInput[i].split("@");
                 String[] labels = (temp[1]).split("\\.");
 
                 if (labels.length != 4) {
-                    throw  new Exception("invalid ip address");
+                    throw  new UserInputException("Invalid ip address");
                 }
 
                 ArrayList<Integer> intLabels = new ArrayList<>();
-                for (int y = 0; y < labels.length; y++) {
-                    Integer intValue = Integer.parseInt(labels[y]);
+                for (String label : labels) {
+                    Integer intValue = Integer.parseInt(label);
                     if (intValue >= 128) {
-                        throw new Exception("invalid ip address");
+                        throw new UserInputException("Invalid ip address");
                     }
 
                     intLabels.add(intValue);
@@ -102,14 +112,14 @@ public class DNSClient {
                 boolean isInvalidName = labels.stream().anyMatch(n -> n.length() == 0)
                         || labels.size() == 0;
                 if (isInvalidName) {
-                    throw new Exception("incorrect userinput");
+                    throw new UserInputException("Invalid name");
                 }
 
                 domainName = userInput[i];
                 continue;
             }
 
-            throw new Exception("Unknown options");
+            throw new UserInputException("Unknown options");
             //todo: should describe the error!! redesign it!!!
             //todo: should be able to figure out some are missing (here or in main??)
 
@@ -122,11 +132,11 @@ public class DNSClient {
         }
 
         if (server == null) {
-            throw new Exception("server is not provided");
+            throw new UserInputException("Server IP address is not provided");
         }
 
         if (domainName == null) {
-            throw  new Exception("name is not provided");
+            throw  new UserInputException("Name is not provided");
         }
 
     }
