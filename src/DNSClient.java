@@ -16,7 +16,70 @@ public class DNSClient {
     static String domainName;
 
     static int retryCount = 0;
+    	int headerSize=16;
+	int questionSize=6;
 
+	DatagramPacket  buildQueryPacket(String ip, String hostName) {
+		ArrayList<Byte> header = new ArrayList<Byte>();
+		int id = (int)Math.random();
+		header.add((byte)id);//stores 8-15 bits of the id
+		header.add((byte)(id>>8));//stores 0-7 bits of the id
+		header.add((byte) 1);//RD is set to 1
+		header.add((byte) 0);
+		header.add((byte) 0);
+		header.add((byte) 1);//QDCount will always be 1
+		header.add((byte) 0);
+		header.add((byte) 0);
+		header.add((byte) 0);
+		header.add((byte) 0);
+		header.add((byte) 0);
+		header.add((byte) 0);
+		
+		int qType=0;//TODO: shall it initialize to 0 here?
+		if(type==Type.A) {
+			qType=0x1;
+		}
+		if(type==Type.NS) {
+			qType=0x2;
+		}
+		if(type==Type.MX) {
+			qType=0xf;
+		}
+//		byte[] question = new byte[questionSize];
+//		question[2]=0x0;
+//		question[3]=(byte)qType;
+//		question[4]=0x0;
+//		question[5]=0x1;
+		ArrayList<Byte> question = new ArrayList<Byte>();
+		String[] fragments = domainName.split("\\.");
+		int size = fragments.length;
+		for (int i = 0; i < size; i++) {
+			String fragment = fragments[i];
+			int length = fragment.length();
+			question.add((byte) length);
+			byte[] qName = fragment.getBytes();
+			for(int j=0; j<qName.length;j++) {
+				question.add((Byte)qName[j]);
+			}
+		}
+		question.add((byte)0x0);
+		question.add((byte)qType);
+		question.add((byte)0x0);
+		question.add((byte)0x1);
+		ArrayList<Byte> packetArrayList = new ArrayList<Byte>();
+		packetArrayList.addAll(header);
+		packetArrayList.addAll(question);
+		byte[] packetArray = new byte[packetArrayList.size()];
+		for(int i=0; i<packetArrayList.size();i++) {
+			packetArray[i]=packetArrayList.get(i);
+		}
+		// TODO: how to handle ip(ip here is a string, and it should be converted to InetAddress)
+        
+		DatagramPacket query= new DatagramPacket(packetArray,packetArray.length,ip,port);
+		
+		return query;
+	}
+    
     public static void main(String[] args) {
         try {
             parseUserInput(args);
