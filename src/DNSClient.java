@@ -79,7 +79,37 @@ public class DNSClient {
 		
 		return query;
 	}
-    
+	
+    String interpretResponsePacket(DatagramPacket packet) {
+		byte[] response = packet.getData();
+		int ID = (int) (response[0]*Math.pow(2, 8) + response[1]);		
+		int AA = response[2] & 8;
+		int RA = response[3] & 8;
+		if(RA==0) {//TODO: check if RA is 0 indicates that not support recursion
+			System.out.println("Error: Recursive queries are not suppported.");
+		}
+		int RCODE = response[3] & 15;
+		if (RCODE == 1) {
+			System.out.println("Format error: the name server was unable to interpret the query.");
+		}else if (RCODE == 2) {
+			System.out.println("Server Failure: the name server was unable to process this qeury due to a problem with the name server.");
+		}else if (RCODE == 3) {
+			System.out.println("Name error: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
+		}else if (RCODE == 4) {
+			System.out.println("Not implemented: the name server does not support the requested kind of query");
+		}else if (RCODE == 5) {
+			System.out.println("Refused: the name server refuses to perform the requested operation for policy reasons");
+		}
+		int QDCOUNT = (int) (response[4]*Math.pow(2, 8) + response[5]);
+		int ANCOUNT = (int) (response[6]*Math.pow(2, 8) + response[7]);
+		int NSCOUNT = (int) (response[8]*Math.pow(2, 8) + response[9]);
+		int ARCOUNT = (int) (response[10]*Math.pow(2, 8) + response[11]);
+		//TODO: parse until the data set.
+		int index = 12;
+		
+				
+		return null;
+	}
     public static void main(String[] args) {
         try {
             parseUserInput(args);
