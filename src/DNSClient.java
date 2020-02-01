@@ -73,7 +73,7 @@ public class DNSClient {
 		for(int i=0; i<packetArrayList.size();i++) {
 			packetArray[i]=packetArrayList.get(i);
 		}
-		// TODO: how to handle ip(ip here is a string, and it should be converted to InetAddress)
+		// TODO: ignore the other part or put 0s in them
         
 		DatagramPacket query= new DatagramPacket(packetArray,packetArray.length,ip,port);
 		
