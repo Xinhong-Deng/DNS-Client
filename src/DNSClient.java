@@ -19,7 +19,7 @@ public class DNSClient {
     	int headerSize=16;
 	int questionSize=6;
 
-	DatagramPacket  buildQueryPacket(String ip, String hostName) {
+	private static DatagramPacket buildQueryPacket(InetAddress ip) {
 		ArrayList<Byte> header = new ArrayList<Byte>();
 		int id = (int)Math.random();
 		header.add((byte)id);//stores 8-15 bits of the id
@@ -80,7 +80,7 @@ public class DNSClient {
 		return query;
 	}
 	
-    String interpretResponsePacket(DatagramPacket packet) {
+    private static String interpretResponsePacket(DatagramPacket packet) {
 		byte[] response = packet.getData();
 		int ID = (int) (response[0]*Math.pow(2, 8) + response[1]);		
 		int AA = response[2] & 8;
@@ -117,7 +117,7 @@ public class DNSClient {
             InetAddress addr = InetAddress.getByAddress(server.array());
             DatagramSocket socket = new DatagramSocket(port, addr);
             socket.setSoTimeout(timeOutMs);
-            DatagramPacket queryPacket = buildQueryPacket();
+            DatagramPacket queryPacket = buildQueryPacket(addr);
 
             int lengthResponseBytes = 100;
             byte[] responseBytes = new byte[lengthResponseBytes];
@@ -134,10 +134,10 @@ public class DNSClient {
             System.out.println("ERROR\t" + "IP address provided is unknown: " + Arrays.toString(server.array()));
         } catch (SocketException e) {
             System.out.println("ERROR\t" + "Cannot open socket");
-        } catch (IOException e) {
-            System.out.println("ERROR\t" + "I/O exception at send");
         } catch (SocketTimeoutException e) {
             System.out.println("ERROR\t");
+        } catch (IOException e) {
+            System.out.println("ERROR\t" + "I/O exception at send");
         }
     }
 
@@ -153,7 +153,7 @@ public class DNSClient {
             tryReceiveResponse(socket, responsePacket);
 
         } catch (IOException e) {
-
+            System.out.println("ERROR\t" + "I/O exception at send");
         }
         retryCount = 0;
     }
