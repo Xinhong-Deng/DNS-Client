@@ -140,6 +140,51 @@ public class DNSClient {
             System.out.println("ERROR\t" + "I/O exception at send");
         }
     }
+	Pair<ArrayList<String>, Integer> getName(byte[]response, int index){
+		
+		ArrayList<String> names = new ArrayList<String>();
+		Integer i = index;//i is the current index
+		Pair <ArrayList<String>, Integer> result;
+		while(i<(response.length-1)) {
+			if((byte)(response[i]&0xC0)==0xC0) {
+				int pointer = (int) ((response[i]&0x3F)*Math.pow(2, 8))+response[i+1];
+				i=i+2;
+				names.addAll(getName(response, pointer).getKey());
+			}
+			String name = "";
+			while(response[i]!=0) {
+				char curChar = (char) response[i];
+				if (Character.isDigit(curChar)) {
+					i++;
+					curChar = (char) response[i];
+					i++;
+					for(int j =0; j<(int)curChar;j++) {
+						curChar = (char) response[i];
+						i++;
+						if(Character.isLetter(curChar)) {
+							name = name + curChar;
+						}else {
+							result = new Pair<ArrayList<String>, Integer>(names, i); 
+							return result;
+						}
+					}
+					
+				}else {
+					result= new Pair<ArrayList<String>, Integer>(names,i); 
+					return result;
+				}
+				name = name + '.';
+				
+			}
+			if(name.compareTo("")!=0)
+				names.add(name);
+			
+				
+		}
+		result = new Pair<ArrayList<String>, Integer>(names,i);
+		return result;
+		
+	}
 
     private static void tryReceiveResponse(DatagramSocket socket, DatagramPacket responsePacket) throws SocketTimeoutException  {
         //todo: double check this
