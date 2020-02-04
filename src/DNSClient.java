@@ -1,9 +1,12 @@
+import javafx.util.Pair;
+
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 public class DNSClient {
     enum Type {A, MX, NS}
@@ -16,13 +19,15 @@ public class DNSClient {
     static String domainName;
 
     static int retryCount = 0;
-    	int headerSize=16;
+    int headerSize=16;
 	int questionSize=6;
+	static int id;
 
 	private static DatagramPacket buildQueryPacket(InetAddress ip) {
 		ArrayList<Byte> header = new ArrayList<Byte>();
-		int id = (int)Math.random();
-		header.add((byte)id);//stores 8-15 bits of the id
+        Random random = new Random();
+		id = random.nextInt(4096);
+		header.add((byte) id);//stores 8-15 bits of the id
 		header.add((byte)(id>>8));//stores 0-7 bits of the id
 		header.add((byte) 1);//RD is set to 1
 		header.add((byte) 0);
@@ -170,7 +175,7 @@ public class DNSClient {
 					}
 					
 				}else {
-					result= new Pair<ArrayList<String>, Integer>(names,i); 
+					result= new Pair<ArrayList<String>, Integer>(names,i);
 					return result;
 				}
 				name = name + '.';
