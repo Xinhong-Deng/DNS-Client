@@ -19,8 +19,8 @@ public class DNSClient {
     static String domainName;
 
     static int retryCount = 0;
-    static int headerSize=16;
-	static int questionSize=6;
+    static int headerSize;
+	static int questionSize;
 	static int id;
 
 	private static DatagramPacket buildQueryPacket(InetAddress ip) {
@@ -54,8 +54,7 @@ public class DNSClient {
 		question.add((byte)0x1);
         questionSize = question.size();
 
-		ArrayList<Byte> packetArrayList = new ArrayList<>();
-		packetArrayList.addAll(header);
+        ArrayList<Byte> packetArrayList = new ArrayList<>(header);
 		byte[] packetArray = new byte[packetArrayList.size()];
 		for(int i=0; i<packetArrayList.size();i++) {
 			packetArray[i]=packetArrayList.get(i);
@@ -64,32 +63,44 @@ public class DNSClient {
         return new DatagramPacket(packetArray,packetArray.length,ip,port);
 	}
 	
-    private static String interpretResponsePacket(DatagramPacket packet) {
+    private static String interpretResponsePacket(DatagramPacket packet) throws ResponseException {
 		byte[] response = packet.getData();
-		int ID = (int) (response[0]*Math.pow(2, 8) + response[1]);		
-		int AA = response[2] & 8;
-		int RA = response[3] & 8;
-		if(RA==0) {//TODO: check if RA is 0 indicates that not support recursion
-			System.out.println("Error: Recursive queries are not suppported.");
+
+        //todo: check it???
+		int ID = (int) (response[0]*Math.pow(2, 8) + response[1]);
+		if (ID != id) {
+		    throw new ResponseException("The response id does not match the query id.");
+        }
+
+        //todo: check correct calculation???
+		int AA = response[2] & 8;       //AA is at bit 5??
+		int RA = response[3] & 8;       //RA at bit 0??
+		if(RA==0) {
+		    //TODO: check if RA is 0 indicates that not support recursion
+            throw new ResponseException("Error: Recursive queries are not suppported.");
 		}
-		int RCODE = response[3] & 15;
+		int RCODE = response[3] & 15;   //RCODE at bit 4-7
 		if (RCODE == 1) {
-			System.out.println("Format error: the name server was unable to interpret the query.");
+			throw new ResponseException("Format error: the name server was unable to interpret the query.");
 		}else if (RCODE == 2) {
-			System.out.println("Server Failure: the name server was unable to process this qeury due to a problem with the name server.");
+            throw new ResponseException("Server Failure: the name server was unable to process this qeury due to a problem with the name server.");
 		}else if (RCODE == 3) {
-			System.out.println("Name error: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
+            throw new ResponseException("Name error: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
 		}else if (RCODE == 4) {
-			System.out.println("Not implemented: the name server does not support the requested kind of query");
+            throw new ResponseException("Not implemented: the name server does not support the requested kind of query");
 		}else if (RCODE == 5) {
-			System.out.println("Refused: the name server refuses to perform the requested operation for policy reasons");
+            throw new ResponseException("Refused: the name server refuses to perform the requested operation for policy reasons");
 		}
+
 		int QDCOUNT = (int) (response[4]*Math.pow(2, 8) + response[5]);
 		int ANCOUNT = (int) (response[6]*Math.pow(2, 8) + response[7]);
 		int NSCOUNT = (int) (response[8]*Math.pow(2, 8) + response[9]);
 		int ARCOUNT = (int) (response[10]*Math.pow(2, 8) + response[11]);
 		//TODO: parse until the data set.
-		int index = 12;
+
+        Pair<ArrayList<String>, Integer> temp = getName(response, headerSize + questionSize);
+        ArrayList<String> names = temp.getKey();
+        int currentIndex = temp.getValue();
 		
 				
 		return null;
@@ -122,10 +133,12 @@ public class DNSClient {
             System.out.println("ERROR\t");
         } catch (IOException e) {
             System.out.println("ERROR\t" + "I/O exception at send");
+        } catch (ResponseException e) {
+            System.out.println(e.getErrorMessage());
         }
     }
 
-	Pair<ArrayList<String>, Integer> getName(byte[]response, int index){
+	static Pair<ArrayList<String>, Integer> getName(byte[]response, int index){
 		
 		ArrayList<String> names = new ArrayList<String>();
 		Integer i = index;//i is the current index
