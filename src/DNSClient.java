@@ -19,8 +19,8 @@ public class DNSClient {
     static String domainName;
 
     static int retryCount = 0;
-    int headerSize=16;
-	int questionSize=6;
+    static int headerSize=16;
+	static int questionSize=6;
 	static int id;
 
 	private static DatagramPacket buildQueryPacket(InetAddress ip) {
@@ -39,50 +39,29 @@ public class DNSClient {
 		header.add((byte) 0);
 		header.add((byte) 0);
 		header.add((byte) 0);
+		headerSize = header.size();
 		
-		int qType=0;//TODO: shall it initialize to 0 here?
-		if(type==Type.A) {
-			qType=0x1;
-		}
-		if(type==Type.NS) {
-			qType=0x2;
-		}
-		if(type==Type.MX) {
-			qType=0xf;
-		}
+		int qType = getQType();
 //		byte[] question = new byte[questionSize];
 //		question[2]=0x0;
 //		question[3]=(byte)qType;
 //		question[4]=0x0;
 //		question[5]=0x1;
-		ArrayList<Byte> question = new ArrayList<Byte>();
-		String[] fragments = domainName.split("\\.");
-		int size = fragments.length;
-		for (int i = 0; i < size; i++) {
-			String fragment = fragments[i];
-			int length = fragment.length();
-			question.add((byte) length);
-			byte[] qName = fragment.getBytes();
-			for(int j=0; j<qName.length;j++) {
-				question.add((Byte)qName[j]);
-			}
-		}
-		question.add((byte)0x0);
+		ArrayList<Byte> question = new ArrayList<>();
+        addNameToQuestion(question);
 		question.add((byte)qType);
 		question.add((byte)0x0);
 		question.add((byte)0x1);
-		ArrayList<Byte> packetArrayList = new ArrayList<Byte>();
+        questionSize = question.size();
+
+		ArrayList<Byte> packetArrayList = new ArrayList<>();
 		packetArrayList.addAll(header);
-		packetArrayList.addAll(question);
 		byte[] packetArray = new byte[packetArrayList.size()];
 		for(int i=0; i<packetArrayList.size();i++) {
 			packetArray[i]=packetArrayList.get(i);
 		}
 		// TODO: ignore the other part or put 0s in them
-        
-		DatagramPacket query= new DatagramPacket(packetArray,packetArray.length,ip,port);
-		
-		return query;
+        return new DatagramPacket(packetArray,packetArray.length,ip,port);
 	}
 	
     private static String interpretResponsePacket(DatagramPacket packet) {
@@ -145,6 +124,7 @@ public class DNSClient {
             System.out.println("ERROR\t" + "I/O exception at send");
         }
     }
+
 	Pair<ArrayList<String>, Integer> getName(byte[]response, int index){
 		
 		ArrayList<String> names = new ArrayList<String>();
@@ -190,6 +170,34 @@ public class DNSClient {
 		return result;
 		
 	}
+
+	private static int getQType() {
+        if(type==Type.A) {
+            return 0x1;
+        }
+        if(type==Type.NS) {
+            return 0x2;
+        }
+        if(type==Type.MX) {
+            return 0xf;
+        }
+
+        // not belong to any type. should be an exception...
+        return 0;
+    }
+
+    private static void addNameToQuestion(ArrayList<Byte> question) {
+        String[] fragments = domainName.split("\\.");
+        for (String fragment : fragments) {
+            int length = fragment.length();
+            question.add((byte) length);
+            byte[] qName = fragment.getBytes();
+            for (byte b : qName) {
+                question.add(b);
+            }
+        }
+        question.add((byte)0x0);
+    }
 
     private static void tryReceiveResponse(DatagramSocket socket, DatagramPacket responsePacket) throws SocketTimeoutException  {
         //todo: double check this
