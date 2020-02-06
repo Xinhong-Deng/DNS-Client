@@ -25,14 +25,14 @@ public class DNSClient {
             parseUserInput(args);
             testParser();
             InetAddress addr = InetAddress.getByAddress(server.array());
-            DatagramSocket socket = new DatagramSocket(port, addr);
+            DatagramSocket socket = new DatagramSocket();
             socket.setSoTimeout(timeOutMs);
             DNSMessage dnsMessage = new DNSMessage(type, domainName);
             DatagramPacket queryPacket = dnsMessage.buildQueryPacket(addr, port);
 
-            int lengthResponseBytes = 100;
+            int lengthResponseBytes = 1024;
             byte[] responseBytes = new byte[lengthResponseBytes];
-            DatagramPacket responsePacket = new DatagramPacket(responseBytes, lengthResponseBytes, addr, port);
+            DatagramPacket responsePacket = new DatagramPacket(responseBytes, lengthResponseBytes);
             socket.send(queryPacket);
 
             tryReceiveResponse(socket, responsePacket);
@@ -46,7 +46,7 @@ public class DNSClient {
         } catch (SocketException e) {
             System.out.println("ERROR\t" + "Cannot open socket");
         } catch (SocketTimeoutException e) {
-            System.out.println("ERROR\t");
+            System.out.println("ERROR\t" + e.getMessage());
         } catch (IOException e) {
             System.out.println("ERROR\t" + "I/O exception at send");
         } catch (ResponseException e) {
@@ -137,7 +137,7 @@ public class DNSClient {
                 ArrayList<Integer> intLabels = new ArrayList<>();
                 for (String label : labels) {
                     Integer intValue = Integer.parseInt(label);
-                    if (intValue >= 128) {
+                    if (intValue >= 256) {
                         throw new UserInputException("Invalid ip address");
                     }
 
