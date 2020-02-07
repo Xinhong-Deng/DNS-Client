@@ -22,14 +22,15 @@ public class DNSMessage {
     }
 
     DatagramPacket buildQueryPacket(InetAddress ip, int port) {
+        // todo: length of query is 12!!! wrong!!
         Random random = new Random();
         id = random.nextInt(4096);
         header.add((byte) id);//stores 8-15 bits of the id
         header.add((byte) (id >> 8));//stores 0-7 bits of the id
-        header.add((byte) 1);//RD is set to 1
+        header.add((byte) 0x01);//QR - RD
         header.add((byte) 0);
-        header.add((byte) 0);
-        header.add((byte) 1);//QDCount will always be 1
+        header.add((byte) 0);//QDCount will always be 1
+        header.add((byte) 1);
         header.add((byte) 0);
         header.add((byte) 0);
         header.add((byte) 0);
@@ -39,11 +40,13 @@ public class DNSMessage {
 
         int qType = getQType();
         addNameToQuestion();
+        question.add((byte) 0x0);
         question.add((byte) qType);
         question.add((byte) 0x0);
         question.add((byte) 0x1);
 
         ArrayList<Byte> packetArrayList = new ArrayList<>(header);
+        packetArrayList.addAll(question);
         byte[] packetArray = new byte[packetArrayList.size()];
         for (int i = 0; i < packetArrayList.size(); i++) {
             packetArray[i] = packetArrayList.get(i);
@@ -91,19 +94,22 @@ public class DNSMessage {
         ArrayList<String> names = temp.getKey();
         int currentIndex = temp.getValue();
 
+        short answerType =  response[currentIndex];
+
+
 
         return null;
     }
 
     private int getQType() {
         if (this.type == DNSClient.Type.A) {
-            return 0x1;
+            return 0x01;
         }
         if (this.type == DNSClient.Type.NS) {
-            return 0x2;
+            return 0x02;
         }
         if (this.type == DNSClient.Type.MX) {
-            return 0xf;
+            return 0x0f;
         }
 
         return 0;
