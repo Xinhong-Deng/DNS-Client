@@ -73,6 +73,10 @@ public class DNSMessage {
 
         short headerL2 = responseB.getShort();
         int AA = (headerL2 & 0b0000010000000000) >>> 10;
+        String auth = "nonauth";
+        if (AA == 1) {
+            auth = "auth";
+        }
 
         int RA = (headerL2 & 0b0000000010000000) >>> 7;
         if (RA == 0) {
@@ -99,29 +103,42 @@ public class DNSMessage {
         short ARCOUNT = responseB.getShort();
 
         responseB.position(header.size() + question.size());
-        for (int i = 0; i < ANCOUNT; i++) {
+        StringBuilder stringBuilder = rrProcessor(responseB, ANCOUNT, auth);
+
+        // skip the authority section
+        rrProcessor(responseB, NSCOUNT, auth);
+
+        stringBuilder.append(rrProcessor(responseB, ARCOUNT, auth));
+
+        return stringBuilder.toString();
+    }
+
+    private StringBuilder rrProcessor(ByteBuffer responseB, int rrCount, String auth) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < rrCount; i++) {
             String name = getName(responseB);
             short anType = responseB.getShort();
             short anClass = responseB.getShort();
             int ttl = responseB.getInt();
-            short rdLength = responseB.getShort();
-            String rdata = "";
+            short rdLength = responseB.getShort();  //todo: check whether you will need this to check for the rdata
+            String outputEnd = "\t" + ttl + "\t" + auth + "\n";
             if (anType == 1) {
-                rdata = processARdata(responseB);
+                String s = "IP\t" + processARdata(responseB) + outputEnd;
+                stringBuilder.append(s);
             } else if (anType == 2) {
-                rdata = processNSRdata(responseB);
+                String s = "NS\t" + processNSRdata(responseB) + outputEnd;
+                stringBuilder.append(s);
             } else if (anType == 5) {
-                rdata = processCNAMERdata(responseB);
+                String s = "CNAME\t" + processCNAMERdata(responseB) + outputEnd;
+                stringBuilder.append(s);
             } else if (anType == 15) {
                 Pair<Short, String> p = processMXRdata(responseB);
+                String s = "MX\t" + "\t" + p.getValue() + "\t" + p.getKey() + outputEnd;
+                stringBuilder.append(s);
             }
         }
-        //todo: put the response together or maybe create a data type?
-        //todo: skip the authority part
-        //todo: process the additional section (same structure as the answer section)
 
-
-        return null;
+        return stringBuilder;
     }
 
     private Pair<Short, String> processMXRdata(ByteBuffer response) {
@@ -139,10 +156,10 @@ public class DNSMessage {
     }
 
     private String processARdata(ByteBuffer responseB) {
-        responseB.get();
         StringBuilder sBuilder = new StringBuilder();
         for (int i = 0; i < 4; i++) {
-            sBuilder.append(responseB.get()).append('.');
+            short temp = (short)((short)responseB.get() & 0b0000000011111111);
+            sBuilder.append(temp).append('.');
         }
         sBuilder.deleteCharAt(sBuilder.length() - 1);
         return sBuilder.toString();
@@ -216,6 +233,9 @@ public class DNSMessage {
         }
 
         if (temp == 0) {
+            if (name.length() != 0) {
+                name.deleteCharAt(name.length() - 1);
+            }
             return response.position();
         }
 
