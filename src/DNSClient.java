@@ -10,19 +10,18 @@ import java.util.List;
 public class DNSClient {
     public enum Type {A, MX, NS}
 
-    static int timeOutMs = 5000;
-    static int maxRetries = 3;
-    static int port = 53;
-    static Type type = Type.A;
-    static ByteBuffer server;
-    static String domainName;
+    private static int timeOutMs = 5000;
+    private static int maxRetries = 3;
+    private static int port = 53;
+    private static Type type = Type.A;
+    private static ByteBuffer server;
+    private static String domainName;
 
-    static int retryCount = 0;
+    private static int retryCount = 0;
 
     public static void main(String[] args) {
         try {
             parseUserInput(args);
-            testParser();
             InetAddress addr = InetAddress.getByAddress(server.array());
             DatagramSocket socket = new DatagramSocket();
             socket.setSoTimeout(timeOutMs);

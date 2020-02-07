@@ -25,7 +25,6 @@ public class DNSMessage {
     }
 
     DatagramPacket buildQueryPacket(InetAddress ip, int port) {
-        // todo: length of query is 12!!! wrong!!
         Random random = new Random();
         id = random.nextInt(65535);
         header.add((byte) id);//stores 8-15 bits of the id
@@ -54,22 +53,20 @@ public class DNSMessage {
         for (int i = 0; i < packetArrayList.size(); i++) {
             packetArray[i] = packetArrayList.get(i);
         }
-        // TODO: ignore the other part or put 0s in them
+
         return new DatagramPacket(packetArray, packetArray.length, ip, port);
     }
 
     String interpretResponsePacket(DatagramPacket packet) throws ResponseException {
         ByteBuffer responseB = ByteBuffer.allocate(packet.getData().length).put(packet.getData());
         temp = packet.getData();
-        //todo: check it???
+
         responseB.rewind();
         byte b0 = responseB.get();
         byte b1 = responseB.get();
-        short ID = (short) (b0 | (b1 << 8));
-        //todo: still not working...
-//        if (ID != id) {
-//            throw new ResponseException("The response id does not match the query id.");
-//        }
+        if (b0 != (byte)id || b1 != (id >>> 8)) {
+            throw new ResponseException("The response id does not match the query id.");
+        }
 
         short headerL2 = responseB.getShort();
         int AA = (headerL2 & 0b0000010000000000) >>> 10;
