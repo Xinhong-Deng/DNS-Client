@@ -15,6 +15,8 @@ public class DNSMessage {
     DNSClient.Type type;
     String domainName;
 
+    byte[] temp;
+
     DNSMessage(DNSClient.Type type, String domainName) {
         this.type = type;
         this.domainName = domainName;
@@ -58,15 +60,16 @@ public class DNSMessage {
 
     String interpretResponsePacket(DatagramPacket packet) throws ResponseException {
         ByteBuffer responseB = ByteBuffer.allocate(packet.getData().length).put(packet.getData());
-
+        temp = packet.getData();
         //todo: check it???
         responseB.rewind();
         byte b0 = responseB.get();
         byte b1 = responseB.get();
-        int ID = (b0 | (b1 << 8));
-        if (ID != id) {
-            throw new ResponseException("The response id does not match the query id.");
-        }
+        short ID = (short) (b0 | (b1 << 8));
+        //todo: still not working...
+//        if (ID != id) {
+//            throw new ResponseException("The response id does not match the query id.");
+//        }
 
         short headerL2 = responseB.getShort();
         int AA = (headerL2 & 0b0000010000000000) >>> 10;
@@ -94,17 +97,55 @@ public class DNSMessage {
         short ANCOUNT = responseB.getShort();
         short NSCOUNT = responseB.getShort();
         short ARCOUNT = responseB.getShort();
-        //TODO: parse until the data set.
 
-//        Pair<ArrayList<String>, Integer> temp = getName(response, header.size() + question.size());
-//        ArrayList<String> names = temp.getKey();
-//        int currentIndex = temp.getValue();
-//
-//        short answerType =  response[currentIndex];
-
+        responseB.position(header.size() + question.size());
+        for (int i = 0; i < ANCOUNT; i++) {
+            String name = getName(responseB);
+            short anType = responseB.getShort();
+            short anClass = responseB.getShort();
+            int ttl = responseB.getInt();
+            short rdLength = responseB.getShort();
+            String rdata = "";
+            if (anType == 1) {
+                rdata = processARdata(responseB);
+            } else if (anType == 2) {
+                rdata = processNSRdata(responseB);
+            } else if (anType == 5) {
+                rdata = processCNAMERdata(responseB);
+            } else if (anType == 15) {
+                Pair<Short, String> p = processMXRdata(responseB);
+            }
+        }
+        //todo: put the response together or maybe create a data type?
+        //todo: skip the authority part
+        //todo: process the additional section (same structure as the answer section)
 
 
         return null;
+    }
+
+    private Pair<Short, String> processMXRdata(ByteBuffer response) {
+        short preference = response.getShort();
+        String exchange = getName(response);
+        return new Pair<>(preference, exchange);
+    }
+
+    private String processCNAMERdata(ByteBuffer response) {
+        return getName(response);
+    }
+
+    private String processNSRdata(ByteBuffer response) {
+        return getName(response);
+    }
+
+    private String processARdata(ByteBuffer responseB) {
+        responseB.get();
+        StringBuilder sBuilder = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            sBuilder.append(responseB.get()).append('.');
+        }
+        sBuilder.deleteCharAt(sBuilder.length() - 1);
+        return sBuilder.toString();
     }
 
     private int getQType() {
@@ -134,50 +175,54 @@ public class DNSMessage {
         question.add((byte) 0x0);
     }
 
-    private Pair<ArrayList<String>, Integer> getName(byte[] response, int index) {
-        // todo: possible for a pointer points to a pointer!!!
-        // todo: need to change the byte[] to bytebuffer for easier oepration...
-        ArrayList<String> names = new ArrayList<String>();
-        Integer i = index;//i is the current index
-        Pair<ArrayList<String>, Integer> result;
-        while (i < (response.length - 1)) {
-            if ((byte) (response[i] & 0xC0) == 0xC0) {
-                int pointer = (int) ((response[i] & 0x3F) * Math.pow(2, 8)) + response[i + 1];
-                i = i + 2;
-                names.addAll(getName(response, pointer).getKey());
-            }
-            StringBuilder name = new StringBuilder();
-            while (response[i] != 0) {
-                char curChar = (char) response[i];
-                if (Character.isDigit(curChar)) {
-                    i++;
-                    curChar = (char) response[i];
-                    i++;
-                    for (int j = 0; j < (int) curChar; j++) {
-                        curChar = (char) response[i];
-                        i++;
-                        if (Character.isLetter(curChar)) {
-                            name.append(curChar);
-                        } else {
-                            result = new Pair<ArrayList<String>, Integer>(names, i);
-                            return result;
-                        }
-                    }
+    /**
+     * may use this function in RDATA and NAME of the answer section
+     * @param responseB
+     * @return
+     */
+    private String getName(ByteBuffer responseB) {
+        // todo: keep a map to be referred to when accessing through pointer?
+        // move the position to answer section
 
-                } else {
-                    result = new Pair<ArrayList<String>, Integer>(names, i);
-                    return result;
-                }
-                name.append('.');
+        StringBuilder name = new StringBuilder();
+        int p = getNameByByte(responseB,
+                responseB.position(),
+                name);
 
-            }
-            if (name.toString().compareTo("") != 0)
-                names.add(name.toString());
-
-
-        }
-        result = new Pair<>(names, i);
-        return result;
-
+        responseB.position(p);
+        return name.toString();
     }
+
+    /**
+     * this function will build the string until it sees a pointer or 0
+     * will not change the current position of the response
+     * will return where it stops back
+     * @param response
+     * @param position
+     * @param name
+     * @return
+     */
+    private int getNameByByte(ByteBuffer response, int position, StringBuilder name) {
+        response = response.duplicate();
+        response.position(position);
+        byte temp = response.get();
+        while (((temp & 0b11000000) != 0b11000000) && temp != 0) {
+            byte partLength = temp;
+            temp = response.get();     // move it to the start of the name part
+            for (byte i = 0; i < partLength; i++, temp = response.get()) {
+                name.append((char) temp);
+            }
+            name.append('.');
+        }
+
+        if (temp == 0) {
+            return response.position();
+        }
+
+        byte p = response.get();
+        getNameByByte(response, p, name);
+
+        return response.position();
+    }
+
 }
