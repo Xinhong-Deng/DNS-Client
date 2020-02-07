@@ -2,6 +2,7 @@ import javafx.util.Pair;
 
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -24,7 +25,7 @@ public class DNSMessage {
     DatagramPacket buildQueryPacket(InetAddress ip, int port) {
         // todo: length of query is 12!!! wrong!!
         Random random = new Random();
-        id = random.nextInt(4096);
+        id = random.nextInt(65535);
         header.add((byte) id);//stores 8-15 bits of the id
         header.add((byte) (id >> 8));//stores 0-7 bits of the id
         header.add((byte) 0x01);//QR - RD
@@ -56,22 +57,27 @@ public class DNSMessage {
     }
 
     String interpretResponsePacket(DatagramPacket packet) throws ResponseException {
-        byte[] response = packet.getData();
+        ByteBuffer responseB = ByteBuffer.allocate(packet.getData().length).put(packet.getData());
 
         //todo: check it???
-        int ID = (int) (response[0] * Math.pow(2, 8) + response[1]);
+        responseB.rewind();
+        byte b0 = responseB.get();
+        byte b1 = responseB.get();
+        int ID = (b0 | (b1 << 8));
         if (ID != id) {
             throw new ResponseException("The response id does not match the query id.");
         }
 
-        //todo: check correct calculation???
-        int AA = response[2] & 8;       //AA is at bit 5??
-        int RA = response[3] & 8;       //RA at bit 0??
+        short headerL2 = responseB.getShort();
+        int AA = (headerL2 & 0b0000010000000000) >>> 10;
+
+        int RA = (headerL2 & 0b0000000010000000) >>> 7;
         if (RA == 0) {
             //TODO: check if RA is 0 indicates that not support recursion
             throw new ResponseException("Error: Recursive queries are not suppported.");
         }
-        int RCODE = response[3] & 15;   //RCODE at bit 4-7
+
+        int RCODE = (headerL2 & 0b0000000000001111);   //RCODE at bit 4-7
         if (RCODE == 1) {
             throw new ResponseException("Format error: the name server was unable to interpret the query.");
         } else if (RCODE == 2) {
@@ -84,17 +90,17 @@ public class DNSMessage {
             throw new ResponseException("Refused: the name server refuses to perform the requested operation for policy reasons");
         }
 
-        int QDCOUNT = (int) (response[4] * Math.pow(2, 8) + response[5]);
-        int ANCOUNT = (int) (response[6] * Math.pow(2, 8) + response[7]);
-        int NSCOUNT = (int) (response[8] * Math.pow(2, 8) + response[9]);
-        int ARCOUNT = (int) (response[10] * Math.pow(2, 8) + response[11]);
+        short QDCOUNT = responseB.getShort();
+        short ANCOUNT = responseB.getShort();
+        short NSCOUNT = responseB.getShort();
+        short ARCOUNT = responseB.getShort();
         //TODO: parse until the data set.
 
-        Pair<ArrayList<String>, Integer> temp = getName(response, header.size() + question.size());
-        ArrayList<String> names = temp.getKey();
-        int currentIndex = temp.getValue();
-
-        short answerType =  response[currentIndex];
+//        Pair<ArrayList<String>, Integer> temp = getName(response, header.size() + question.size());
+//        ArrayList<String> names = temp.getKey();
+//        int currentIndex = temp.getValue();
+//
+//        short answerType =  response[currentIndex];
 
 
 
@@ -129,7 +135,8 @@ public class DNSMessage {
     }
 
     private Pair<ArrayList<String>, Integer> getName(byte[] response, int index) {
-
+        // todo: possible for a pointer points to a pointer!!!
+        // todo: need to change the byte[] to bytebuffer for easier oepration...
         ArrayList<String> names = new ArrayList<String>();
         Integer i = index;//i is the current index
         Pair<ArrayList<String>, Integer> result;
