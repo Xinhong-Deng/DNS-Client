@@ -105,9 +105,14 @@ public class DNSMessage {
         stringBuilder.append("DNSClient sending request for " + domainName + "\n")
                 .append("Server: " + getServerString() + "\n")
                 .append("Request type: " + type + "\n")
-        .append("Response received after " + ((float)durationMilli / 1000) +" seconds (" + retryCount + " retries) \n")
-        .append("***Answer Section (" + ANCOUNT + " records)*** \n");
+                .append("Response received after " + ((float) durationMilli / 1000) + " seconds (" + retryCount + " retries) \n");
 
+        if (ANCOUNT == 0) {
+            stringBuilder.append("NOTFOUND \n");
+            return stringBuilder.toString();
+        }
+
+        stringBuilder.append("***Answer Section (" + ANCOUNT + " records)*** \n");
         stringBuilder.append(rrProcessor(responseB, ANCOUNT, auth));
 
         // skip the authority section
@@ -127,7 +132,7 @@ public class DNSMessage {
             s.append(b);
             s.append('.');
         }
-        s.deleteCharAt(s.length()-1);
+        s.deleteCharAt(s.length() - 1);
         return s.toString();
     }
 
@@ -177,7 +182,7 @@ public class DNSMessage {
     private String processARdata(ByteBuffer responseB) {
         StringBuilder sBuilder = new StringBuilder();
         for (int i = 0; i < 4; i++) {
-            short temp = (short)((short)responseB.get() & 0b0000000011111111);
+            short temp = (short) ((short) responseB.get() & 0b0000000011111111);
             sBuilder.append(temp).append('.');
         }
         sBuilder.deleteCharAt(sBuilder.length() - 1);
@@ -213,6 +218,7 @@ public class DNSMessage {
 
     /**
      * may use this function in RDATA and NAME of the answer section
+     *
      * @param responseB
      * @return
      */
@@ -233,6 +239,7 @@ public class DNSMessage {
      * this function will build the string until it sees a pointer or 0
      * will not change the current position of the response
      * will return where it stops back
+     *
      * @param response
      * @param position
      * @param name
