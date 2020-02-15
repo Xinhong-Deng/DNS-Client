@@ -1,5 +1,3 @@
-import javafx.util.Pair;
-
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -18,6 +16,7 @@ public class DNSClient {
     private static String domainName;
 
     private static int retryCount = 0;
+    private static long timeMilli = 0;
 
     public static void main(String[] args) {
         try {
@@ -25,16 +24,17 @@ public class DNSClient {
             InetAddress addr = InetAddress.getByAddress(server.array());
             DatagramSocket socket = new DatagramSocket();
             socket.setSoTimeout(timeOutMs);
-            DNSMessage dnsMessage = new DNSMessage(type, domainName);
+            DNSMessage dnsMessage = new DNSMessage(type, domainName, server);
             DatagramPacket queryPacket = dnsMessage.buildQueryPacket(addr, port);
 
             int lengthResponseBytes = 1024;
             byte[] responseBytes = new byte[lengthResponseBytes];
             DatagramPacket responsePacket = new DatagramPacket(responseBytes, lengthResponseBytes);
             socket.send(queryPacket);
+            timeMilli = System.currentTimeMillis();
 
             tryReceiveResponse(socket, responsePacket);
-            String interpredResult = dnsMessage.interpretResponsePacket(responsePacket);
+            String interpredResult = dnsMessage.interpretResponsePacket(responsePacket, retryCount, timeMilli);
             System.out.println(interpredResult);
 
         } catch (UserInputException e) {
@@ -56,6 +56,7 @@ public class DNSClient {
         //todo: double check this
         try {
             socket.receive(responsePacket);
+            timeMilli = System.currentTimeMillis() - timeMilli;
         } catch (SocketTimeoutException e) {
             if (retryCount > maxRetries) {
                 throw new SocketTimeoutException("Exceed max retry limit.");
@@ -108,7 +109,7 @@ public class DNSClient {
 
             if (userInput[i].equals("-mx")) {
                 if (type != Type.A) {
-                    throw new UserInputException("Cannot set to -ns and -mx at the same time");
+                    throw new UserInputException("Cannot set to -ns and -mx at the same timeMilli");
                 }
 
                 type = Type.MX;
@@ -117,7 +118,7 @@ public class DNSClient {
 
             if (userInput[i].equals("-ns")) {
                 if (type != Type.A) {
-                    throw new UserInputException("Cannot set to -ns and -mx at the same time");
+                    throw new UserInputException("Cannot set to -ns and -mx at the same timeMilli");
                 }
 
                 type = Type.NS;

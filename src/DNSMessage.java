@@ -14,14 +14,16 @@ public class DNSMessage {
     int id;
     DNSClient.Type type;
     String domainName;
+    byte[] server;
 
-    byte[] temp;
-
-    DNSMessage(DNSClient.Type type, String domainName) {
+    DNSMessage(DNSClient.Type type, String domainName, ByteBuffer server) {
         this.type = type;
         this.domainName = domainName;
         header = new ArrayList<>();
         question = new ArrayList<>();
+        this.server = new byte[4];
+        server.rewind();
+        server.get(this.server);
     }
 
     DatagramPacket buildQueryPacket(InetAddress ip, int port) {
@@ -57,16 +59,15 @@ public class DNSMessage {
         return new DatagramPacket(packetArray, packetArray.length, ip, port);
     }
 
-    String interpretResponsePacket(DatagramPacket packet) throws ResponseException {
+    String interpretResponsePacket(DatagramPacket packet, int retryCount, long durationMilli) throws ResponseException {
         ByteBuffer responseB = ByteBuffer.allocate(packet.getData().length).put(packet.getData());
-        temp = packet.getData();
 
         responseB.rewind();
         byte b0 = responseB.get();
         byte b1 = responseB.get();
-        if (b0 != (byte)id || b1 != (id >>> 8)) {
-            throw new ResponseException("The response id does not match the query id.");
-        }
+//        if (b0 != (byte)id || b1 != (id >>> 8)) {
+//            throw new ResponseException("The response id does not match the query id.");
+//        }
 
         short headerL2 = responseB.getShort();
         int AA = (headerL2 & 0b0000010000000000) >>> 10;
@@ -100,18 +101,39 @@ public class DNSMessage {
         short ARCOUNT = responseB.getShort();
 
         responseB.position(header.size() + question.size());
-        StringBuilder stringBuilder = rrProcessor(responseB, ANCOUNT, auth);
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("DNSClient sending request for " + domainName + "\n")
+                .append("Server: " + getServerString() + "\n")
+                .append("Request type: " + type + "\n")
+        .append("Response received after " + (durationMilli * 1000) +" seconds (" + retryCount + " retries) \n")
+        .append("***Answer Section (" + ANCOUNT + " records)*** \n");
+
+        stringBuilder.append(rrProcessor(responseB, ANCOUNT, auth));
 
         // skip the authority section
         rrProcessor(responseB, NSCOUNT, auth);
 
-        stringBuilder.append(rrProcessor(responseB, ARCOUNT, auth));
+        if (ARCOUNT != 0) {
+            stringBuilder.append("***Additional Section (" + ARCOUNT + " records)*** \n");
+            stringBuilder.append(rrProcessor(responseB, ARCOUNT, auth));
+        }
 
         return stringBuilder.toString();
     }
 
+    private String getServerString() {
+        StringBuilder s = new StringBuilder();
+        for (byte b : server) {
+            s.append(b);
+            s.append('.');
+        }
+        s.deleteCharAt(s.length()-1);
+        return s.toString();
+    }
+
     private StringBuilder rrProcessor(ByteBuffer responseB, int rrCount, String auth) {
         StringBuilder stringBuilder = new StringBuilder();
+
         for (int i = 0; i < rrCount; i++) {
             String name = getName(responseB);
             short anType = responseB.getShort();
