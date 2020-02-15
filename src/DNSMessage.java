@@ -105,7 +105,7 @@ public class DNSMessage {
         stringBuilder.append("DNSClient sending request for " + domainName + "\n")
                 .append("Server: " + getServerString() + "\n")
                 .append("Request type: " + type + "\n")
-        .append("Response received after " + (durationMilli * 1000) +" seconds (" + retryCount + " retries) \n")
+        .append("Response received after " + ((float)durationMilli / 1000) +" seconds (" + retryCount + " retries) \n")
         .append("***Answer Section (" + ANCOUNT + " records)*** \n");
 
         stringBuilder.append(rrProcessor(responseB, ANCOUNT, auth));
